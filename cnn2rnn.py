@@ -52,6 +52,7 @@ class DecoderRNN(nn.Module):
         return outputs
 
     def infer(self,start_state):
+        
 
 
 
