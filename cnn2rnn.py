@@ -4,7 +4,7 @@ from torch.autograd import Variable
 from torch import optim
 import torch.nn.functional as F
 import torchvision.models as models
-from torchvision import transforms
+
 from torch.nn.utils.rnn import pack_padded_sequence
 from torch.nn import CrossEntropyLoss
 
@@ -14,45 +14,70 @@ import load_data
 
 
 class EncoderCNN(nn.Module):
-    def __init__(self,embeding_size):
-        super(EncoderCNN,self).__init__()
-        m=models.resnet152(pretrained=True)
-        layers=list(m.children())[:-1]
-        self.cnn=nn.Sequential(*layers).cuda(2)
-        self.linear=nn.Linear(m.fc.in_features,embeding_size).cuda(2)
-        self.linear.weight.data.normal_(0.0, 0.02)
-        self.linear.bias.data.fill_(0)
+	def __init__(self,embeding_size,CUDA_DEVICE):
+		super(EncoderCNN,self).__init__()
+		m=models.resnet152(pretrained=True)
+		layers=list(m.children())[:-1]
+		self.cnn=nn.Sequential(*layers).cuda(CUDA_DEVICE)
+		self.linear=nn.Linear(m.fc.in_features,embeding_size).cuda(CUDA_DEVICE)
+		self.linear.weight.data.normal_(0.0, 0.02)
+		self.linear.bias.data.fill_(0)
+		self.bn = nn.BatchNorm1d(embeding_size, momentum=0.01).cuda(CUDA_DEVICE)
 
-    def forward(self,inputs):
-        features = self.cnn(inputs)
-        features = Variable(features.data)
-        features = features.view(features.size(0), -1)
-        features = self.linear(features)
-        return features
+	def forward(self,inputs):
+		features = self.cnn(inputs)
+		features = Variable(features.data)
+		features = features.view(features.size(0), -1)
+		features = self.linear(features)
+		features = self.bn(features)
+		return features
 
 class DecoderRNN(nn.Module):
-    def __init__(self,embeding_size,hidden_size,output_size):
-        super(DecoderRNN,self).__init__()
-        self.embed = nn.Embedding(output_size, embeding_size).cuda(2)
-        self.gru=nn.GRU(embeding_size,hidden_size,batch_first=True).cuda(2)
-        self.linear=nn.Linear(hidden_size,output_size).cuda(2)
-        self.softmax=nn.Softmax(dim=1)
-        self.linear.weight.data.uniform_(-0.1, 0.1)
-        self.linear.bias.data.fill_(0)
-        self.embed.weight.data.uniform_(-0.1, 0.1)
+	def __init__(self,embeding_size,hidden_size,output_size,CUDA_DEVICE):
+		super(DecoderRNN,self).__init__()
+		self.embed = nn.Embedding(output_size, embeding_size).cuda(CUDA_DEVICE)
+		self.gru=nn.GRU(embeding_size,hidden_size,batch_first=True).cuda(CUDA_DEVICE)
+		self.linear=nn.Linear(hidden_size,output_size).cuda(CUDA_DEVICE)
+		self.softmax=nn.Softmax(dim=1)
+		self.linear.weight.data.uniform_(-0.1, 0.1)
+		self.linear.bias.data.fill_(0)
+		self.embed.weight.data.uniform_(-0.1, 0.1)
 
-    def forward(self,inputs,start_state,lengths):
-        inputs=self.embed(inputs)    
-        start_state=start_state.unsqueeze(1)
-        new_inputs=torch.cat([start_state, inputs], dim=1)
-        lengths=lengths.cpu().data.numpy().flatten().astype('int').tolist()
-        packed = pack_padded_sequence(new_inputs, lengths, batch_first=True) 
-        hiddens, _ = self.gru(packed)
-        outputs = self.linear(hiddens[0])
-        return outputs
+	def forward(self,inputs,start_state,lengths):
+		inputs=self.embed(inputs)	
+		start_state=start_state.unsqueeze(1)
+		new_inputs=torch.cat([start_state, inputs], dim=1)
+		lengths=lengths.cpu().data.numpy().flatten().astype('int').tolist()
+		packed = pack_padded_sequence(new_inputs, lengths, batch_first=True) 
+		hiddens, _ = self.gru(packed)
+		outputs = self.linear(hiddens[0])
+		return outputs
 
-    def infer(self,start_state):
-        
+	def infer(self,start_state,max_samples):
+		eos_reached=False
+		EOS_TOKEN=18
+
+		context=start_state
+		context=context.unsqueeze(1)
+		predictions=[]
+		outputs=[]
+		samples_count=0
+
+		states=None
+		while(samples_count<max_samples):
+			hiddens,states=self.gru(context,states)
+			output=self.linear(hiddens)
+			predicted = output.max(2)[1]
+			context=self.embed(predicted)
+			# print(predicted)
+			predictions.append(predicted.data)
+			outputs.append(output)
+			samples_count+=1
+
+
+		return torch.cat(predictions,1),torch.cat(outputs,1)
+
+
 
 
 

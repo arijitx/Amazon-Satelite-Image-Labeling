@@ -1,5 +1,8 @@
 import numpy as np 
 import math 
+from torchvision import transforms
+from tqdm import tqdm
+import torch
 
 def padd_labels(labels):
 	new_labels_train=[]
@@ -18,14 +21,11 @@ def padd_labels(labels):
 		new_labels_train.append(padded_label_train)
 		new_labels_target.append(padded_label_target)
 
-	sorted_lengths_i=lengths.flatten().argsort()
 
 	padded_labels_train=np.array(new_labels_train).reshape((len(new_labels_train),max_size+1))
-	padded_labels_target=np.array(new_labels_target).reshape((len(new_labels_target),max_size))
-	lengths=lengths[sorted_lengths_i[::-1]]
-	padded_labels_train=padded_labels_train[sorted_lengths_i[::-1]]
-	padded_labels_target=padded_labels_target[sorted_lengths_i[::-1]]
-	return padded_labels_train.astype('int'),lengths.astype('int')
+	# padded_labels_target=np.array(new_labels_target).reshape((len(new_labels_target),max_size))
+	# padded_labels_target=padded_labels_target[sorted_lengths_i[::-1]]
+	return padded_labels_train.astype('int'),lengths.astype('int'),max_size+1
 
 def load_labels(label_path):
 	return padd_labels(np.load(label_path))
@@ -52,8 +52,12 @@ def one_hot_labels(labels,vocab_size):
 class DataGen():
 	def __init__(self,im_path,labels_path,batch_size=256):
 		self.im=load_images(im_path)
+		normalize=transforms.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])
+		print('> Normalizing Images')
+		for i in tqdm(range(self.im.shape[0])):
+			self.im[i]=normalize(torch.from_numpy(self.im[i]))
 		print('> Loading Images Done .')
-		self.labels,self.lengths=load_labels(labels_path)
+		self.labels,self.lengths,self.labels_max_size=load_labels(labels_path)
 		self.batch_size=batch_size
 		self.idx=0
 		self.n=range(math.floor(self.im.shape[0]/self.batch_size))
@@ -62,8 +66,23 @@ class DataGen():
 		im_batch=self.im[self.idx*self.batch_size:(self.idx+1)*self.batch_size]
 		lbl_batch=self.labels[self.idx*self.batch_size:(self.idx+1)*self.batch_size]
 		lens_batch=self.lengths[self.idx*self.batch_size:(self.idx+1)*self.batch_size]
+		sorted_lengths_i=lens_batch.flatten().argsort()
+		lens_batch=lens_batch[sorted_lengths_i[::-1]]
+		lbl_batch=lbl_batch[sorted_lengths_i[::-1]]
+		im_batch=im_batch[sorted_lengths_i[::-1]]
 		self.idx+=1
 		return im_batch,lbl_batch,lens_batch
+
+	def data(self):
+		return self.im,self.labels,self.lengths
+
+	def reset(self):
+		self.idx=0
+		p = np.random.permutation(self.im.shape[0])
+		self.im=self.im[p]
+		self.labels=self.labels[p]
+		self.lengths=self.lengths[p]
+
 
 # train,target,lens=load_labels('data/labels.npy')
 # print(train[1])
