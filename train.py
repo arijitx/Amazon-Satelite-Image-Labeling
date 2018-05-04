@@ -1,96 +1,317 @@
-from load_data import DataGen
-from cnn2rnn import EncoderCNN,DecoderRNN
-import argparse
-from tqdm import tqdm
-
-from torchvision import transforms
+# torch imports
 import torch
-import torch.nn as nn
-from torch.autograd import Variable
-from torch import optim
-import torch.nn.functional as F
-import torchvision.models as models
-from torchvision import transforms
-from torch.nn.utils.rnn import pack_padded_sequence
-from torch.nn import CrossEntropyLoss
+from torch import nn
+from torch.autograd import Variable as var 
+from torch.nn.utils.rnn import pack_padded_sequence as pack
+from torch.nn.utils.rnn import pad_packed_sequence as unpack
+import torchvision.transforms as T
+from torch.utils.data import DataLoader
 
-import numpy as np 
+# standard imports
+import json
+import pandas as pd
+from collections import namedtuple
+import argparse
+from AmazonDataset import AmazonDataset
+import os
+import numpy as np
+# from models.cnn_rnn_caption import EncoderCNN,DecoderRNN
+from models.cnn_rnn_attn import EncoderCNN, DecoderRNN
 
 
+IMAGENET_MEAN = [0.485, 0.456, 0.406]
+IMAGENET_STD = [0.229, 0.224, 0.225]
 
-epochs=10
-learing_rate=0.0001
-batch_size=128
-hidden_size=256
-emb_size=256
-output_size=19
-CUDA_DEVICE=2
-validation_per_batch=5
+def f2_score(pred,true_labels,eps = 1e-8):
+	pos = len(pred & true_labels)
+	precision = 1.0 * pos / (len(pred) + eps)
+	recall = 1.0 * pos / (len(true_labels) + eps)
+	beta = 2
+	f2 = (1.0 + beta**2)*precision*recall / (beta**2 * precision + recall + eps)
+	return f2
 
-train_data=DataGen('processed_data/train_ims.npy','processed_data/train_labels.npy',batch_size=batch_size)
-val_data=DataGen('processed_data/val_ims.npy','processed_data/val_labels.npy',batch_size=batch_size)
+def to_var(x, volatile=False):
+	if torch.cuda.is_available():
+		x = x.cuda(config.training.cuda_device)
+	return var(x, volatile=volatile)
 
-enc=EncoderCNN(emb_size,CUDA_DEVICE).float()
-dec=DecoderRNN(emb_size,hidden_size,output_size,CUDA_DEVICE).float()
-criterion=nn.CrossEntropyLoss()
-criterion_val=nn.CrossEntropyLoss()
+def parse():
+	config=json.loads(open('config.json','r').read(),object_hook=lambda d: namedtuple('X', d.keys())(*d.values()))
+	return config
 
-print('> Models Created ! ')
+def collate_fn(data):
+	# manipulate batch
+	data.sort(key=lambda x: len(x[1]), reverse=True)
+	images, labels = zip(*data)
+	images = torch.stack(images, 0)
+	lengths = [len(label) for label in labels]
+	targets = torch.zeros(len(labels), max(lengths)).long()
+	for i, label in enumerate(labels):
+		end = lengths[i]
+		targets[i, :end] = label[:end]
+	return images, targets, lengths
 
-params = list(dec.parameters()) + list(enc.linear.parameters()) + list(enc.bn.parameters())
-optimizer = torch.optim.Adam(params, lr=learing_rate)
-total_loss=0
+def main(config):
+	best_f2=0
 
-for e in range(epochs):
-	train_data.reset()
-	for bi in train_data.n:
-		#get batch 
-		imb,lbb,lnb=train_data.get_batch()
+	def add_eos(target):
+		return torch.Tensor(sorted(target) + [18]*(18 - len(target)))
 
-		#load variables to gpu
-		imb=Variable(torch.from_numpy(imb),requires_grad=False,volatile=True).float().cuda(CUDA_DEVICE)
-		lbb=Variable(torch.from_numpy(lbb)).cuda(CUDA_DEVICE)
-		lnb=Variable(torch.from_numpy(lnb)).cuda(CUDA_DEVICE)
+	def one_hot(target):
+		target=[x-1 for x in target]
+		target_oh=np.zeros(18)
+		target_oh[target]=1.
+		return torch.Tensor(target_oh)
 
-		#pack_padded_Seq Len for target
-		lens=lnb.cpu().data.numpy().flatten().astype('int').tolist()
-		targets = pack_padded_sequence(lbb, lens, batch_first=True)[0]
+	loss_list=[]
 
-		#encoder- decoder forward
-		context=enc.forward(imb)
-		output=dec.forward(lbb,context,lnb)
+	# train dataset transform
+	train_transform = T.Compose([
+		T.Resize(256),
+		T.RandomResizedCrop(224),
+		T.RandomHorizontalFlip(),
+		T.ToTensor(),
+		T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)
+	])
 
-		#zerograd enc dec
-		enc.zero_grad()
-		dec.zero_grad()
+	# val dataset transform
+	val_transform = T.Compose([
+		T.Resize(224),
+		T.CenterCrop(224),
+		T.ToTensor(),
+		T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+	])
 
-		#compute loss
-		loss=criterion(output,targets)
+	# init train Dataset
+	train_dataset = AmazonDataset(config.paths.train_dir, 
+							config.paths.train_labels_file, 
+							config.paths.label_list_file, 
+							transform = train_transform, 
+							target_transform = add_eos)
 
-		#update weights
-		loss.backward()
-		optimizer.step()
+	# init train Dataset
+	train_dataset_pretraining = AmazonDataset(config.paths.train_dir, 
+							config.paths.train_labels_file, 
+							config.paths.label_list_file, 
+							transform = train_transform, 
+							target_transform = one_hot)
 
-		# validation
-		val_data.idx=0
-		val_loss=0
-		total_loss+=loss
-		# print('> Epoch :',e+1,' Batch :',bi+1,' Loss :',loss.data[0])
-		if (bi+1)%validation_per_batch==0:
-			for j in val_data.n:
-				vim,vlb,vln=val_data.get_batch()
-				vim=Variable(torch.from_numpy(vim),requires_grad=False,volatile=True).float().cuda(CUDA_DEVICE)
-				vlb=Variable(torch.from_numpy(vlb)).cuda(CUDA_DEVICE)
-				vln=Variable(torch.from_numpy(vln)).cuda(CUDA_DEVICE)
+	# init val Dataset
+	val_dataset = AmazonDataset(config.paths.val_dir, 
+							config.paths.val_labels_file, 
+							config.paths.label_list_file,
+							transform = val_transform,
+							target_transform = add_eos)
 
-				ctx=enc(vim)
-				val_labels,val_opt=dec.infer(ctx,val_data.labels_max_size)
-				# val_opt=Variable(val_opt).cuda(CUDA_DEVICE)
-				vln=vln.cpu().data.numpy().flatten().astype('int').tolist()
-				vlb=pack_padded_sequence(vlb,vln,batch_first=True)[0]
-				vpred=pack_padded_sequence(val_opt,vln,batch_first=True)[0]
-				val_loss+=criterion(vpred,vlb)
-			val_loss=val_loss/max(val_data.n)+1
-			total_loss=total_loss/validation_per_batch
-			print('> Epoch :',e+1,' Batch :',bi+1,' Loss :',total_loss.data[0],' Val Loss :',val_loss.data[0])
+	# init train loader
+	train_loader = DataLoader(train_dataset,
+							batch_size=config.training.batch_size,
+							num_workers=config.training.n_workers,
+							collate_fn = collate_fn,
+							shuffle=True)
 
+	train_loader_pretraining = DataLoader(train_dataset_pretraining,
+							batch_size=config.training.batch_size,
+							num_workers=config.training.n_workers,
+							shuffle=True)
+	# init val loader
+	val_loader = DataLoader(val_dataset, 
+							batch_size = config.training.batch_size,
+							num_workers = config.training.n_workers)
+
+	# Build the models
+	encoder = EncoderCNN()
+	decoder = DecoderRNN(config.model.embed_size, config.model.hidden_size, encoder.output_size, 19, config.model.total_size)
+
+	# convert models to cuda if cuda available
+	if torch.cuda.is_available():
+		encoder.cuda(config.training.cuda_device)
+		decoder.cuda(config.training.cuda_device)
+	#####################################
+	###          Pretraining          ###
+	#####################################
+	train_pretrain_params=list(encoder.parameters())
+	lr_1=config.training.lr_2
+	bce_loss=nn.BCEWithLogitsLoss()
+	for i in range(5):
+		print("Epoch :",(i+1),"/",5)
+		optimizer=torch.optim.Adam(train_pretrain_params,lr=lr_1)
+		for idx,(images,labels) in enumerate(train_loader_pretraining):
+			images = to_var(images)
+			labels = to_var(labels)
+
+			encoder.zero_grad()
+			decoder.zero_grad()
+
+			logits = encoder.forward(images,class_label=True)
+
+			loss=bce_loss(logits,labels)
+			loss.backward()
+
+			optimizer.step()
+
+			if (idx+1)%config.training.n_batch_print==0:
+				print("Batch [%d/%d] Loss : %.4f"%((idx+1),len(train_loader_pretraining),loss.data[0]))
+
+		lr_1=lr_1/config.training.lr_2_decay
+
+	#####################################
+	###         RNN Training          ###
+	#####################################
+
+	train_1_params=list(decoder.parameters())
+	lr_1=config.training.lr_1
+	cec_loss=nn.CrossEntropyLoss()
+
+	decoder.train()
+
+	# decoder training
+	for i in range(config.training.n_epoch_1):
+		print("Epoch :",(i+1),"/",config.training.n_epoch_1)
+		optimizer=torch.optim.Adam(train_1_params,lr=lr_1)
+		# training loop
+		for idx,(images,labels,lengths) in enumerate(train_loader):
+			images=to_var(images)
+			labels=to_var(labels)
+
+			encoder.zero_grad()
+			decoder.zero_grad()
+
+			cnn_features=encoder(images)
+			outputs=decoder(cnn_features,labels,lengths)
+
+			unbound_labels=torch.unbind(labels,1)
+			unbound_outputs=torch.unbind(outputs,1)
+
+			losses=[cec_loss(unbound_outputs[j],unbound_labels[j]) for j in range(len(unbound_labels))]
+			loss=sum(losses)
+			
+			loss.backward()
+
+			optimizer.step()
+			
+			loss_list.append(loss.data[0])
+			if (idx+1)%config.training.n_batch_print==0:
+				print("Batch [%d/%d] Loss : %.4f"%((idx+1),len(train_loader),loss.data[0]))
+				
+		lr_1=lr_1/config.training.lr_1_decay
+
+		# Validation
+		encoder.eval()
+		decoder.eval()
+
+		f2_score_total=0.
+		n_samples=0
+
+		for k, (images, labels) in enumerate(val_loader):
+			images=to_var(images,volatile=True)
+			cnn_features=encoder(images)
+
+			attn,preds=decoder.sample(cnn_features)
+			batch_size=images.size(0)
+			for j in range(batch_size):
+				pred=preds[j].data.cpu().numpy().tolist()
+				if 18 in pred:
+					pred=pred[:pred.index(18)]
+
+				pred=set(pred)
+				true_labels=set(labels[j])
+				true_labels.remove(18)
+
+				f2_score_total+=f2_score(pred,true_labels)
+				n_samples+=1
+
+		f2=f2_score_total/n_samples
+
+		print("F2 Score :",f2)
+		if f2 > best_f2:
+			best_f2 = f2
+			print('found a new best!')
+			torch.save(decoder.state_dict(), config.paths.rnn_save_path)
+			torch.save(encoder.state_dict(), config.paths.cnn_save_path)
+
+	#####################################
+	### CNN finetuning+ RNN training  ###
+	#####################################
+	encoder.train()
+	decoder.train()
+
+	train_2_params=list(decoder.parameters())+list(encoder.parameters())
+	lr_2=config.training.lr_2
+	cec_loss=nn.CrossEntropyLoss()
+
+
+	for i in range(config.training.n_epoch_2):
+		print("Epoch :",(i+1),"/",config.training.n_epoch_2)
+		optimizer=torch.optim.Adam(train_2_params,lr=lr_2)
+		# training loop
+		for idx,(images,labels,lengths) in enumerate(train_loader):
+			images=to_var(images)
+			labels=to_var(labels)
+
+			encoder.zero_grad()
+			decoder.zero_grad()
+
+			cnn_features=encoder(images)
+			outputs=decoder(cnn_features,labels,lengths)
+
+			unbound_labels=torch.unbind(labels,1)
+			unbound_outputs=torch.unbind(outputs,1)
+
+			losses=[cec_loss(unbound_outputs[j],unbound_labels[j]) for j in range(len(unbound_labels))]
+			loss=sum(losses)
+			
+			loss.backward()
+
+			optimizer.step()
+			
+			loss_list.append(loss.data[0])
+			if (idx+1)%config.training.n_batch_print==0:
+				print("Batch [%d/%d] Loss : %.4f"%((idx+1),len(train_loader),loss.data[0]))
+
+		lr_2=lr_2/config.training.lr_2_decay
+
+		# Validation
+		encoder.eval()
+		decoder.eval()
+
+		f2_score_total=0.
+		n_samples=0
+
+		for k, (images, labels) in enumerate(val_loader):
+			images=to_var(images,volatile=True)
+			cnn_features=encoder(images)
+
+			attn,preds=decoder.sample(cnn_features)
+			batch_size=images.size(0)
+			for j in range(batch_size):
+				pred=preds[j].data.cpu().numpy().tolist()
+				if 18 in pred:
+					pred=pred[:pred.index(18)]
+
+				pred=set(pred)
+				true_labels=set(labels[j])
+				true_labels.remove(18)
+
+				f2_score_total+=f2_score(pred,true_labels)
+				n_samples+=1
+
+		f2=f2_score_total/n_samples
+
+		print("F2 Score :",f2)
+		if f2 > best_f2:
+			best_f2 = f2
+			print('found a new best!')
+			torch.save(decoder.state_dict(), config.paths.rnn_save_path)
+			torch.save(encoder.state_dict(), config.paths.cnn_save_path)
+
+		index=list(range(len(loss_list)))
+
+		loss_track=pd.DataFrame()
+		loss_track['index']=index
+		loss_track['loss']=loss_list
+		loss_track.to_csv(config.paths.save_loss_path,index=False)
+
+if __name__=='__main__':
+	config=parse()
+	main(config)

@@ -1,0 +1,33 @@
+{
+	"paths":{
+		"cnn_save_path"		: "save_model_attn/best_cnn_model.cris",
+		"rnn_save_path" 	: "save_model_attn/best_rnn_model.cris",
+		"save_loss_path"	: "save_model_attn/loss.csv",
+		"label_list_file"	: "dataset/labels.txt",
+		"train_dir"			: "dataset/train/images/",
+		"train_labels_file"	: "dataset/train/labels.csv",
+		"val_dir"			: "dataset/val/images/",
+		"val_labels_file"	: "dataset/val/labels.csv",
+		"test_dir"			: "dataset/test/images",
+		"submission_file"	: "submission.csv"
+	},
+	"model":{
+		"embed_size"		: 128,
+		"hidden_size"		: 512,
+		"total_size"		: 64
+	},
+	"training":{
+		"n_epoch_1"			: 15,
+		"n_epoch_2"			: 20,
+		"lr_1"				: 1e-3,
+		"lr_2"				: 1e-4,
+		"lr_1_decay"		: 1.6,
+		"lr_2_decay"		: 1.4,
+		"load_intial"		: false,
+		"batch_size"		: 32,
+		"n_workers"			: 4,
+		"use_gpu"			: true,
+		"cuda_device"		: 0,
+		"n_batch_print"		: 50
+	}
+}
