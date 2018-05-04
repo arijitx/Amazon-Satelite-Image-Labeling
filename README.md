@@ -129,6 +129,8 @@ CNN-RNN Caption | 89.81 | 89.76
 CNN-RNN Attention | 90.36 | 90.25
 CNN-RNN with CNN pretraining | 90.10 | 89.51
 
+**Current Best in Kaggle Leaderboard 93.32**
+
 ### Attention Visualization
 
 ![](images/res1.jpg)
@@ -138,3 +140,11 @@ CNN-RNN with CNN pretraining | 90.10 | 89.51
 ## To Do
 
 -	Fix Attention
+
+## References
+
+- [CNN-RNN: A Unified Framework for Multi-label Image Classification](https://arxiv.org/abs/1604.04573)
+- [Show and Tell: A Neural Image Caption Generator](https://arxiv.org/abs/1411.4555)
+- [Show, Attend and Tell: Neural Image Caption Generation with Visual Attention](https://arxiv.org/abs/1502.03044)
+- [A CNN-RNN Architecture for Multilabel Classification of the Amazon](cs231n.stanford.edu/reports/2017/posters/903.pdf)
+ 
