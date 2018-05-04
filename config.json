@@ -1,8 +1,8 @@
 {
 	"paths":{
-		"cnn_save_path"		: "save_model_attn/best_cnn_model.cris",
-		"rnn_save_path" 	: "save_model_attn/best_rnn_model.cris",
-		"save_loss_path"	: "save_model_attn/loss.csv",
+		"cnn_save_path"		: "save_models/cnn_rnn_attn/best_cnn_model.model",
+		"rnn_save_path" 	: "save_models/cnn_rnn_attn/best_rnn_model.model",
+		"save_loss_path"	: "save_models/cnn_rnn_attn/loss.csv",
 		"label_list_file"	: "dataset/labels.txt",
 		"train_dir"			: "dataset/train/images/",
 		"train_labels_file"	: "dataset/train/labels.csv",
@@ -28,6 +28,8 @@
 		"n_workers"			: 4,
 		"use_gpu"			: true,
 		"cuda_device"		: 0,
-		"n_batch_print"		: 50
+		"n_batch_print"		: 50,
+		"attention"			: true,
+		"draw_image"		: false
 	}
 }
