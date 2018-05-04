@@ -12,18 +12,20 @@ import json
 import pandas as pd
 import numpy as np
 from collections import namedtuple
-import argparse
 from AmazonDataset import AmazonDataset
 import os
+import sys
 # from models.cnn_rnn import EncoderCNN,DecoderRNN
 from models.cnn_rnn_attn import EncoderCNN,DecoderRNN
 from utils import draw_image
 
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
-attention = True
+
+
 def parse():
-	config=json.loads(open('config.json','r').read(),object_hook=lambda d: namedtuple('X', d.keys())(*d.values()))
+	config_file=sys.argv[1]
+	config=json.loads(open(config_file,'r').read(),object_hook=lambda d: namedtuple('X', d.keys())(*d.values()))
 	return config
 
 def to_var(x, volatile=False):
@@ -94,11 +96,11 @@ def main(config):
 
 			prediction.append(' '.join([classes[k-1] for k in pred]))
 
-		if attention:
+		if attention and config.training.draw_image:
 			draw_image(attn,filename,prediction)
 		filenames+=list(filename)
 		predictions+=prediction
-		return 
+
 	submission=pd.DataFrame()
 	submission['image_name']=filenames
 	submission['tags']=predictions
@@ -109,4 +111,5 @@ def main(config):
 
 if __name__=='__main__':
 	config=parse()
+	attention = config.training.attention
 	main(config)

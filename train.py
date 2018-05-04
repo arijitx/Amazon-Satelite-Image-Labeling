@@ -11,10 +11,10 @@ from torch.utils.data import DataLoader
 import json
 import pandas as pd
 from collections import namedtuple
-import argparse
 from AmazonDataset import AmazonDataset
 import os
 import numpy as np
+import sys
 # from models.cnn_rnn_caption import EncoderCNN,DecoderRNN
 from models.cnn_rnn_attn import EncoderCNN, DecoderRNN
 
@@ -36,7 +36,8 @@ def to_var(x, volatile=False):
 	return var(x, volatile=volatile)
 
 def parse():
-	config=json.loads(open('config.json','r').read(),object_hook=lambda d: namedtuple('X', d.keys())(*d.values()))
+	config_file=sys.argv[1]
+	config=json.loads(open(config_file,'r').read(),object_hook=lambda d: namedtuple('X', d.keys())(*d.values()))
 	return config
 
 def collate_fn(data):
@@ -127,6 +128,7 @@ def main(config):
 	if torch.cuda.is_available():
 		encoder.cuda(config.training.cuda_device)
 		decoder.cuda(config.training.cuda_device)
+		
 	#####################################
 	###          Pretraining          ###
 	#####################################
