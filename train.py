@@ -209,7 +209,10 @@ def main(config):
 			images=to_var(images,volatile=True)
 			cnn_features=encoder(images)
 
-			attn,preds=decoder.sample(cnn_features)
+			if config.training.attention:
+				attn,preds=decoder.sample(cnn_features)
+			else:
+				preds=decoder.sample(cnn_features)
 			batch_size=images.size(0)
 			for j in range(batch_size):
 				pred=preds[j].data.cpu().numpy().tolist()
@@ -283,8 +286,11 @@ def main(config):
 		for k, (images, labels) in enumerate(val_loader):
 			images=to_var(images,volatile=True)
 			cnn_features=encoder(images)
-
-			attn,preds=decoder.sample(cnn_features)
+			
+			if config.training.attention:
+				attn,preds=decoder.sample(cnn_features)
+			else:
+				preds=decoder.sample(cnn_features)
 			batch_size=images.size(0)
 			for j in range(batch_size):
 				pred=preds[j].data.cpu().numpy().tolist()

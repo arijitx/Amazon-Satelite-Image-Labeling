@@ -1,7 +1,7 @@
 {
 	"paths":{
-		"cnn_save_path"		: "save_models/cnn_rnn_attn/best_cnn_model.model",
-		"rnn_save_path" 	: "save_models/cnn_rnn_attn/best_rnn_model.model",
+		"cnn_save_path"		: "save_models/cnn_rnn_attn/cnn.model",
+		"rnn_save_path" 	: "save_models/cnn_rnn_attn/rnn.model",
 		"save_loss_path"	: "save_models/cnn_rnn_attn/loss.csv",
 		"label_list_file"	: "dataset/labels.txt",
 		"train_dir"			: "dataset/train/images/",
