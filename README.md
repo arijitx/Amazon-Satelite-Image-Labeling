@@ -121,13 +121,13 @@ The dataset is available in the contest page to download. We split the dataset i
 
 All our models use GRU and the last attention one uses VGG16 pretrained others use RestNet18. The attention model took 6hrs to train on one GTX 1080. 
 
-Model | Validation | Test
---| -- |
-CNN-RNN | 88.6 | 88.34
-CNN-RNN with CNN fine tuning | 89.81 | 89.61
-CNN-RNN Caption | 89.81 | 89.76
-CNN-RNN Attention | 90.36 | 90.25
-CNN-RNN with CNN pretraining | 90.10 | 89.51
+| Model | Validation | Test |
+|--| -- |--|
+|CNN-RNN | 88.6 | 88.34 |
+|CNN-RNN with CNN fine tuning | 89.81 | 89.61 |
+|CNN-RNN Caption | 89.81 | 89.76 |
+|CNN-RNN Attention | 90.36 | 90.25 |
+|CNN-RNN with CNN pretraining | 90.10 | 89.51 |
 
 **Current Best in Kaggle Leaderboard 93.32**
 
