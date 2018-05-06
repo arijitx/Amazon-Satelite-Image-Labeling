@@ -85,3 +85,5 @@ class AmazonDataset(data.Dataset):
 			target = self.target_transform(target)
 		return img, target
 
+	def __len__(self):
+		return len(self.imgs)
