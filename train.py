@@ -79,7 +79,6 @@ def main(config):
 	# val dataset transform
 	val_transform = T.Compose([
 		T.Resize(224),
-		T.CenterCrop(224),
 		T.ToTensor(),
 		T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
 	])
