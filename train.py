@@ -50,7 +50,7 @@ def collate_fn(data):
 		lengths.append(len(l))
 	targets = torch.zeros(len(labels), max(lengths)).long()
 	for i, label in enumerate(labels):
-		targets[i, :lengths[i]] = label[:end]
+		targets[i, :lengths[i]] = label[:lengths[i]]
 	return images, targets, lengths
 
 def main(config):
@@ -135,7 +135,7 @@ def main(config):
 	train_pretrain_params=list(encoder.parameters())
 	lr_1=config.training.lr_2
 	bce_loss=nn.BCEWithLogitsLoss()
-	for i in range(5):
+	for i in range(0):
 		print("Epoch :",(i+1),"/",5)
 		optimizer=torch.optim.Adam(train_pretrain_params,lr=lr_1)
 		for idx,(images,labels) in enumerate(train_loader_pretraining):
@@ -181,12 +181,13 @@ def main(config):
 
 			cnn_features=encoder(images)
 			outputs=decoder(cnn_features,labels,lengths)
-
-			unbound_labels=torch.unbind(labels,1)
-			unbound_outputs=torch.unbind(outputs,1)
-
-			losses=[cec_loss(unbound_outputs[j],unbound_labels[j]) for j in range(len(unbound_labels))]
-			loss=sum(losses)
+			loss=None
+			for j in range(labels.size(0)):
+				true=labels[j]
+				pred=outputs[j]
+				if loss is None:
+					loss=cec_loss(pred,true)
+				loss+=cec_loss(pred,true)
 			
 			loss.backward()
 
@@ -260,11 +261,13 @@ def main(config):
 			cnn_features=encoder(images)
 			outputs=decoder(cnn_features,labels,lengths)
 
-			unbound_labels=torch.unbind(labels,1)
-			unbound_outputs=torch.unbind(outputs,1)
-
-			losses=[cec_loss(unbound_outputs[j],unbound_labels[j]) for j in range(len(unbound_labels))]
-			loss=sum(losses)
+			loss=None
+			for j in range(labels.size(0)):
+				true=labels[j]
+				pred=outputs[j]
+				if loss is None:
+					loss=cec_loss(pred,true)
+				loss+=cec_loss(pred,true)
 			
 			loss.backward()
 
