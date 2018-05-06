@@ -5,16 +5,22 @@ import os.path
 import pandas as pd
 import json
 
-def find_classes(label_list_file):
+def get_classes(label_list_file):
 	#
 	# list of classes
 	# class to idx dict
 	#
 
 	f = open(label_list_file)
-	classes = [line.strip() for line in f]
+	classes=[]
+	class_to_idx={}
+	i=1
+	for line in f:
+		classes.append(line)
+		class_to_idx[line]=i+1
+		i+=1
 	f.close()
-	class_to_idx={classes[i]:(i+1) for i in range(len(classes))}
+	
 	return classes,class_to_idx
 
 def get_im_to_labels(labels,class_to_idx):
