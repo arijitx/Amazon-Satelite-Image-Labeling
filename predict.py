@@ -34,10 +34,12 @@ def to_var(x, volatile=False):
 	return var(x, volatile=volatile)
 
 def find_classes(label_list_file):
-	f = open(label_list_file)
-	classes = np.array([line.strip() for line in f])
-	f.close()
-	return classes
+	classes=[]
+	with open(label_list_file) as f:
+		for line in f:
+			classes.append(line.strip)
+			classes=np.array(classes)
+			return classes
 
 def filename_clean(target):
 	return target.split('.')[0]

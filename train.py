@@ -44,7 +44,7 @@ def collate_fn(data):
 	# manipulate batch
 	data.sort(key=lambda x: len(x[1]), reverse=True)
 	images, labels = zip(*data)
-	images = torch.stack(images, 0)
+	images = torch.cat(images, 0)
 	lengths = [len(label) for label in labels]
 	targets = torch.zeros(len(labels), max(lengths)).long()
 	for i, label in enumerate(labels):

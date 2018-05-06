@@ -11,17 +11,15 @@ def get_classes(label_list_file):
 	# class to idx dict
 	#
 
-	f = open(label_list_file)
-	classes=[]
-	class_to_idx={}
-	i=1
-	for line in f:
-		classes.append(line.strip())
-		class_to_idx[line.strip()]=i+1
-		i+=1
-	f.close()
-	
-	return classes,class_to_idx
+	with open(label_list_file) as f:
+		classes=[]
+		class_to_idx={}
+		i=1
+		for line in f:
+			classes.append(line.strip())
+			class_to_idx[line.strip()]=i+1
+			i+=1	
+		return classes,class_to_idx
 
 def get_im_to_labels(labels,class_to_idx):
 	#
