@@ -138,7 +138,7 @@ def main(config):
 	train_pretrain_params=list(encoder.parameters())
 	lr_1=config.training.lr_2
 	bce_loss=nn.BCEWithLogitsLoss()
-	for i in range(0):
+	for i in range(5):
 		print("Epoch :",(i+1),"/",5)
 		optimizer=torch.optim.Adam(train_pretrain_params,lr=lr_1)
 		for idx,(images,labels) in enumerate(train_loader_pretraining):
@@ -195,7 +195,6 @@ def main(config):
 			loss.backward()
 
 			optimizer.step()
-			break
 			loss_list.append(loss.data[0])
 			if (idx+1)%config.training.n_batch_print==0:
 				print("Batch [%d/%d] Loss : %.4f"%((idx+1),len(train_loader),loss.data[0]))
