@@ -17,18 +17,20 @@ import numpy as np
 import sys
 # from models.cnn_rnn_caption import EncoderCNN,DecoderRNN
 from models.cnn_rnn_attn import EncoderCNN, DecoderRNN
+from sklearn.metrics import fbeta_score
 
 
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
 
 def f2_score(pred,true_labels,eps = 1e-8):
-	pos = len(pred & true_labels)
-	precision = 1.0 * pos / (len(pred) + eps)
-	recall = 1.0 * pos / (len(true_labels) + eps)
-	beta = 2
-	f2 = (1.0 + beta**2)*precision*recall / (beta**2 * precision + recall + eps)
-	return f2
+	
+	pred_oh=np.zeros(18)
+	true_oh=np.zeros(18)
+	pred_oh[list(pred)]=1.
+	true_oh[list(true_labels)]=1.
+
+	return fbeta_score(true_oh, pred_oh, average='macro', beta=2)
 
 def to_var(x, volatile=False):
 	if torch.cuda.is_available():
@@ -192,7 +194,7 @@ def main(config):
 			loss.backward()
 
 			optimizer.step()
-			
+			break
 			loss_list.append(loss.data[0])
 			if (idx+1)%config.training.n_batch_print==0:
 				print("Batch [%d/%d] Loss : %.4f"%((idx+1),len(train_loader),loss.data[0]))
