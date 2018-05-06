@@ -27,8 +27,9 @@ def f2_score(pred,true_labels,eps = 1e-8):
 	
 	pred_oh=np.zeros(18)
 	true_oh=np.zeros(18)
+
 	pred_oh[list(pred)]=1.
-	true_oh[list(true_labels)]=1.
+	true_oh[list(map(int,list(true_labels)))]=1.
 
 	return fbeta_score(true_oh, pred_oh, average='macro', beta=2)
 
