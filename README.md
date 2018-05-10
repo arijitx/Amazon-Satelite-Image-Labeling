@@ -1,4 +1,4 @@
-# Amazon Stelite Image Labeling
+# Amazon Satelite Image Labeling
 
 ![image](images/contest.png )
 Our task was to solve the problem in [Planet: Understanding the Amazon from Space](https://www.kaggle.com/c/planet-understanding-the-amazon-from-space) .
@@ -140,6 +140,12 @@ All our models use GRU and the last attention one uses VGG16 pretrained others u
 ## To Do
 
 -	Fix Attention
+
+## Contributers
+
+-	Arijit
+-	Kalpesh
+-	Vaishali
 
 ## References
 
